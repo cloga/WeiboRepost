@@ -13,12 +13,12 @@ APP_KEYS_SECRETS=[['key1','secret1'],\
 
 ##随机取出一个app index
 current_index=int(random.random()*100 % len(APP_KEYS_SECRETS))
-post_id=3528703286207696
+post_id=3528703286207696##替换为需要查找微博的MID
 edges={}
 def access_client(app_index):
     APP_KEY= APP_KEYS_SECRETS[app_index][0] #app key
     APP_SECRET = APP_KEYS_SECRETS[app_index][1] # app secret
-    CALLBACK_URL = 'http://www.cloga.info' # callback url
+    CALLBACK_URL = 'http://www.cloga.info' # 换成你的callback url
     username=''#填入微博账号
     password=''#填入微博密码
     client = APIClient(app_key=APP_KEY, app_secret=APP_SECRET, redirect_uri=CALLBACK_URL)
