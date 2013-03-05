@@ -4,78 +4,24 @@ from weibo import APIClient
 from urllib2 import HTTPError
 from sqlite3 import IntegrityError
 import urllib,httplib,urlparse,pickle,sqlite3,random,time,datetime
-import json,sys,os,couchdb
+import json,sys,os
 import math
-#定义供替换的APP Key和Secret
-APP_KEYS_SECRETS=[['key1','secret1'],\
-                  ['key2','secret2']
-                  ]##填入任意个Key Secret对，每对Key Secret是一个List
 
-##随机取出一个app index
-current_index=int(random.random()*100 % len(APP_KEYS_SECRETS))
-post_id=3528703286207696##替换为需要查找微博的MID
+post_id=3552242097011889##替换为需要查找微博的MID
 edges={}
-def access_client(app_index):
-    APP_KEY= APP_KEYS_SECRETS[app_index][0] #app key
-    APP_SECRET = APP_KEYS_SECRETS[app_index][1] # app secret
-    CALLBACK_URL = 'http://www.cloga.info' # 换成你的callback url
-    username=''#填入微博账号
-    password=''#填入微博密码
-    client = APIClient(app_key=APP_KEY, app_secret=APP_SECRET, redirect_uri=CALLBACK_URL)
-    url = client.get_authorize_url()
-    conn = httplib.HTTPSConnection('api.weibo.com')
-    postdata = urllib.urlencode({'client_id':APP_KEY,'response_type':'code','redirect_uri':CALLBACK_URL,'action':'submit','userId':username,'passwd':password,'isLoginSina':0,'from':'','regCallback':'','state':'','ticket':'','withOfficalFlag':0})
-    conn.request('POST','/oauth2/authorize',postdata,{'Referer':url, 'Content-Type': 'application/x-www-form-urlencoded'})
-    res = conn.getresponse()
-    page = res.read()
-    conn.close()##拿新浪给的code
-    code = urlparse.parse_qs(urlparse.urlparse(res.msg['location']).query)['code'][0]
-    token = client.request_access_token(code)
-    access_token = token.access_token # 新浪返回的token，类似abc123xyz456
-    expires_in = token.expires_in # token过期的UNIX时间：http://zh.wikipedia.org/wiki/UNIX%E6%97%B6%E9%97%B4
-    # TODO: 在此可保存access token
-    client.set_access_token(access_token, expires_in)##生成token
+def access_client():
+    client = APIClient(app_key='APP_KEY', app_secret='APP_SECRET', redirect_uri='CALLBACK_URL')
+    client.set_access_token('2.00Hk5I5B3mz1gE5d178ada323SS3HB','12')##填入获得token
     return client
 
-client=access_client(current_index)
+client=access_client()
 
-##选取下一个app index
-def get_app_index(pre_index):
-    if pre_index==len(APP_KEYS_SECRETS)-1:
-        return 0
-    else:
-        return pre_index+1
-    
 def get_repost_timeline(id,count=200,page=1,max_id=0):
-    try:
-        return client.statuses.repost_timeline.get(id=id,count=count,page=page,max_id=max_id)
-    except Exception,e:
-        print e
-        global client
-        global current_index
-        global next_index
-        print 'current_index',current_index
-        next_index=get_app_index(current_index)
-        print 'next_index',next_index
-        client=access_client(next_index)
-        current_index=next_index
-        return get_repost_timeline(id=id,count=count,page=page,max_id=max_id)
+    return client.statuses.repost_timeline.get(id=id,count=count,page=page,max_id=max_id)
 
 def get_show(id):
-    try:
-        return client.statuses.show.get(id=id)
-    except Exception,e:
-        print e
-        global client
-        global current_index
-        global next_index
-        print 'current_index',current_index
-        next_index=get_app_index(current_index)
-        client=access_client(next_index)
-        current_index=next_index
-        print 'next_index',next_index
-        return get_show(id=id)
-
+    return client.statuses.show.get(id=id)
+    
 def get_reposts(post_id,max_id=0):
     total_number=get_repost_timeline(id=post_id,count=200)['total_number']
     print total_number
@@ -138,10 +84,15 @@ def get_edges(post_id,edeges={},length=1):
 
 def generate_dot(file_name,data):
     OUT = file_name+".dot"
+    OUT1 = file_name+'_edges'+".csv"
     dot = ['"%s" -> "%s" [weibo_id=%s]' % ( edges[weibo_id]['reposted'].encode('gbk','ignore'),edges[weibo_id]['poster'].encode('gbk','ignore'), weibo_id) for weibo_id in edges.keys()]
+    dot1 = ['%s,%s,%s' % ( edges[weibo_id]['reposted'].encode('gbk','ignore'),edges[weibo_id]['poster'].encode('gbk','ignore'), weibo_id) for weibo_id in edges.keys()]
     with open(OUT,'w') as f:
         f.write('strict digraph {\nnode [fontname="FangSong"]\n%s\n}' % (';\n'.join(dot),))
         print file_name,'dot file export'
+    with open(OUT1,'w') as f:    
+        f.write('poster,reposter,weiboid\n'+'\n'.join(dot1))
+        print file_name,'edge file export'
         
 def generate_csv(post_id,reposts):
     OUT = str(post_id)+".csv"
@@ -161,4 +112,4 @@ print 'edges:',len(edges.keys())
 print 'length:',length
 ##print 'edges:',len(edges.keys())
 generate_dot(str(post_id),edges)
-##generate_csv(str(post_id))
+print '当前路径为:'+os.getcwd()
