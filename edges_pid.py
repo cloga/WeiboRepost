@@ -6,16 +6,21 @@ import urllib,httplib,urlparse,time,datetime
 import json,sys,os
 import math,csv
 from pandas import DataFrame
+import networkx as nx
+import matplotlib
 
-post_id=3494834545042114##替换为需要查找微博的MID
+
+post_id=3572508797738487##替换为需要查找微博的MID
 
 def access_client():
     client = APIClient(app_key='APP_KEY', app_secret='APP_SECRET', redirect_uri='CALLBACK_URL')
-    client.set_access_token('XXXXXX','12')##填入获得token，形式为:2.00Hk5I5B3mz1gEda51bd5caewZ5BMC
+    client.set_access_token('2.00Hk5I5B3mz1gEda51bd5caewZ5BMC','12')##填入获得token,形式为2.00Hk5I5B3mz1gEda51bd5caewZ5BMC
     return client
 client=access_client()
 def get_repost_timeline(id,count=200,page=1,max_id=0):
     return client.statuses.repost_timeline.get(id=id,count=count,page=page,max_id=max_id)
+def get_comment_show(id,count=200,page=1,max_id=0):
+    return client.comments.show.get(id=id,count=count,page=page,max_id=max_id)
 def get_show(id):
     return client.statuses.show.get(id=id)
 def get_edges(post_id,edges=[],reposts=[]):
@@ -39,7 +44,7 @@ def get_edges(post_id,edges=[],reposts=[]):
             original_poster_id=repost['retweeted_status']['user']['id'],
             original_poster=repost['retweeted_status']['user']['screen_name'].encode('utf-8','ignore'),
             original_weibo_url='http://api.t.sina.com.cn/'+str(repost['retweeted_status']['user']['id'])+'/statuses/'+str(repost['retweeted_status']['id']),
-            original_content=repost['retweeted_status']['text'].encode('utf-8','ignore'),
+##            original_content=repost['retweeted_status']['text'].encode('utf-8','ignore'),
             poster=repost['user']['screen_name'].encode('utf-8','ignore'),
             poster_id=repost['user']['id'],
             content=repost['text'].encode('utf-8','ignore'),
@@ -47,7 +52,34 @@ def get_edges(post_id,edges=[],reposts=[]):
             repost=repost['reposts_count'],
             comment=repost['comments_count'])
         edges.append(edge)
+    DataFrame(edges).to_csv(str(post_id)+'_edges_utf8.csv',index=False)
+    print '当前路径为:'+os.getcwd()
+    print 'edges获取完毕'
+    generate_dot(str(post_id),edges)
+    DG=nx.DiGraph(nx.read_dot(str(post_id)+"_utf8.dot"))
+    nx.write_gexf(DG, str(post_id)+".gexf")
+    print 'generated GEXF complete!'
     return edges
+def get_comments(post_id,comments_list=[],comments=[]):
+    total_number=get_comment_show(post_id)['total_number']
+    page_number=int(math.ceil(total_number/200))
+    for i in range(1,page_number+1):
+        comments+=get_comment_show(post_id,page=i)['comments']
+    for c in comments:
+        comment=dict(
+            comment_content=c['text'].encode('utf-8','ignore'),
+            comment_created_at=c['created_at'],
+            comment_mid=c['mid'],
+            comment_source=c['source'].encode('utf-8','ignore'),
+            comment_user_screen_name=c['user']['screen_name'].encode('utf-8','ignore'),
+            comment_user_id=c['user']['id'],
+            original_mid=c['status']['mid'],
+            original_content=c['status']['text'].encode('utf-8','ignore'),
+            original_screen_name=c['status']['user']['screen_name'].encode('utf-8','ignore'))
+        comments_list.append(comment)
+    DataFrame(comment_list).to_csv(str(post_id)+'_comments_utf8.csv',index=False)
+    print 'generated comments csv completed!'
+    return comments_list
 
 def generate_dot(file_name,data):
     OUT = file_name+"_utf8.dot"
@@ -60,14 +92,6 @@ def generate_dot(file_name,data):
         ##输出原帖作者
         f.write('\n}')
         print file_name,'dot file export'
-        
 
-
-
-        
-edges=get_edges(post_id)
-DataFrame(edges).to_csv(str(post_id)+'_edges.csv',index=False)
-print '当前路径为:'+os.getcwd()
-print 'edges获取完毕'
-generate_dot(str(post_id),edges)
-
+comment_list=get_comments(post_id)
+##edges=get_edges(post_id)
